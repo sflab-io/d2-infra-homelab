@@ -1,4 +1,4 @@
-# homelab-infra
+# d2--infra-homelab
 
 > [!NOTE]
 > This repository is part of the reference architecture for the

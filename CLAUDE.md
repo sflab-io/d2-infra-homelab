@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is the **homelab-infra** repository, part of the Flux D2 architecture for managing Kubernetes cluster infrastructure using Flux Operator and OCI Artifacts.
+This is the **d2-infra-homelab** repository, part of the Flux D2 architecture for managing Kubernetes cluster infrastructure using Flux Operator and OCI Artifacts.
 
 **Purpose:**
 - Define Kubernetes infrastructure components (cluster add-ons, monitoring, logging)
@@ -13,14 +13,14 @@ This is the **homelab-infra** repository, part of the Flux D2 architecture for m
 - Managed by platform team with cluster admin privileges
 
 **Part of D2 Architecture:**
-- [homelab-fleet](https://github.com/abes140377/homelab-fleet) - Cluster fleet management
-- [homelab-infra](https://github.com/abes140377/homelab-infra) - Infrastructure components (this repo)
-- [homelab-apps](https://github.com/abes140377/homelab-apps) - Application delivery (planned)
+- [d2-fleet-homelab](https://github.com/sflab-io/d2-fleet-homelab) - Cluster fleet management
+- [d2-infra-homelab](https://github.com/sflab-io/d2-infra-homelab) - Infrastructure components (this repo)
+- [d2-apps-homelab](https://github.com/sflab-io/d2-apps-homelab) - Application delivery
 
 ## Repository Structure
 
 ```
-homelab-infra/
+d2-infra-homelab/
 ├── .github/
 │   └── workflows/           # CI/CD workflows for OCI artifacts
 │       ├── push-artifact.yaml      # Push on main branch
@@ -41,8 +41,9 @@ homelab-infra/
 │       │   ├── base/
 │       │   ├── production/
 │       │   └── staging/
-│       └── configs/        # ServiceMonitor, PodMonitor, RBAC
+│       └── configs/        # ServiceMonitor, PodMonitor, RBAC, Dashboards
 │           ├── base/
+│           │   └── dashboards/  # Grafana dashboard JSON files
 │           ├── production/
 │           └── staging/
 ├── update-policies/         # Flux ImageRepository and ImagePolicy
@@ -89,7 +90,7 @@ component-name/
 - **Configs:**
   - ServiceMonitor and PodMonitor for Flux components
   - RBAC for monitoring access
-  - Grafana dashboards (cluster, control-plane)
+  - Grafana dashboards (cluster.json, control-plane.json in configs/base/dashboards/)
 - **Update Policies:**
   - kube-prometheus-stack monitoring OCI charts
   - metrics-server monitoring OCI charts
@@ -100,15 +101,15 @@ component-name/
 - **Trigger:** Push to `main` branch or manual dispatch
 - **Action:** Builds and pushes OCI artifacts to GHCR for all components
 - **Matrix:** cert-manager, monitoring
-- **Output:** `ghcr.io/abes140377/homelab-infra/{component}:latest`
+- **Output:** `ghcr.io/sflab-io/d2-infra-homelab/{component}:latest`
 - **Signing:** Cosign signatures for all artifacts
 
 ### Release Artifact (release-artifact.yaml)
 - **Trigger:** Git tags in format `component/version` (e.g., `cert-manager/v1.0.0`)
 - **Action:** Builds and pushes versioned OCI artifact for specific component
 - **Output:**
-  - `ghcr.io/abes140377/homelab-infra/{component}:version`
-  - `ghcr.io/abes140377/homelab-infra/{component}:latest-stable`
+  - `ghcr.io/sflab-io/d2-infra-homelab/{component}:version`
+  - `ghcr.io/sflab-io/d2-infra-homelab/{component}:latest-stable`
 - **Signing:** Cosign signatures
 
 ### Image Updates (image-updates.yaml)
@@ -176,9 +177,9 @@ This repository is consumed by the fleet repository via OCI artifacts:
 apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: OCIRepository
 metadata:
-  name: homelab-infra-cert-manager
+  name: d2-infra-homelab-cert-manager
 spec:
-  url: oci://ghcr.io/abes140377/homelab-infra/cert-manager
+  url: oci://ghcr.io/sflab-io/d2-infra-homelab/cert-manager
   ref:
     tag: latest
 ```
@@ -217,12 +218,12 @@ The fleet repository creates ResourceSets that reference these OCI artifacts, wh
 ### Component Not Updating
 1. Check OCI artifact was pushed:
 ```bash
-flux reconcile source oci homelab-infra-{component} --with-source
+flux reconcile source oci d2-infra-homelab-{component} --with-source
 ```
 
 2. Verify artifact exists in GHCR:
 ```bash
-crane ls ghcr.io/abes140377/homelab-infra/{component}
+crane ls ghcr.io/sflab-io/d2-infra-homelab/{component}
 ```
 
 3. Check ResourceSet status in fleet repository
@@ -262,6 +263,17 @@ flux get image policy {component}
 - `cosign` for signature verification
 - `kustomize` (optional, bundled with kubectl)
 
+### Available mise Tasks
+
+This repository inherits mise tasks from the parent workspace:
+
+```bash
+# Edit SOPS encrypted secrets (inherited from parent)
+mise run secrets:edit
+```
+
+**Note:** Most operational tasks (flux:*, oci:*) are defined in the d2-fleet-homelab repository, not in this infrastructure repository.
+
 ### Local Testing
 ```bash
 # Build and validate component manifests
@@ -271,7 +283,7 @@ flux build kustomization components/{component}/controllers/base
 flux diff kustomization {name} --path components/{component}/controllers/{env}
 
 # Push to OCI (requires GHCR authentication)
-flux push artifact oci://ghcr.io/abes140377/homelab-infra/{component}:test \
+flux push artifact oci://ghcr.io/sflab-io/d2-infra-homelab/{component}:test \
   --path=./components/{component} \
   --source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY \
   --revision=$GITHUB_REF_NAME@sha1:$GITHUB_SHA
@@ -279,9 +291,9 @@ flux push artifact oci://ghcr.io/abes140377/homelab-infra/{component}:test \
 
 ## References
 
-- [Flux D2 Architecture Guide](https://raw.githubusercontent.com/abes140377/distribution/main/guides/ControlPlane_Flux_D2_Reference_Architecture_Guide.pdf)
+- [Flux D2 Architecture Guide](https://raw.githubusercontent.com/controlplaneio-fluxcd/distribution/main/guides/ControlPlane_Flux_D2_Reference_Architecture_Guide.pdf)
 - [Flux Operator Documentation](https://fluxcd.control-plane.io/operator/)
-- [Fleet Repository](https://github.com/abes140377/homelab-fleet)
+- [Fleet Repository](https://github.com/sflab-io/d2-fleet-homelab)
 - [Flux Image Automation](https://fluxcd.io/flux/guides/image-update/)
 
 ## Important Notes
